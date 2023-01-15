@@ -1,6 +1,7 @@
 from constants import EMPTY, WHITE, BLACK
 from random import choice, seed
 import math
+from game import *
 # from copy import deepcopy
 seed(42)  # Get same results temporarily
 
@@ -126,11 +127,13 @@ class RandomHexBot:
 
     def dummy_model_predict(self, state):
 
-        policy_head = [ 0 for _ in self.board]
+        policy_head = [  0.5 for _ in self.board]
+
+        # mask policy with possible moves
         for i, cell in enumerate(state):
-            if cell == EMPTY:
-                policy_head[i] = 0.5
-        
+            if cell != EMPTY:
+                policy_head[i] = 0
+                
         value_head = 0.5
 
         return value_head, policy_head
@@ -147,6 +150,8 @@ class RandomHexBot:
         value, action_probs = self.dummy_model_predict(self.board)
         root.expand(action_probs)
 
+
+        # simple function to turn board into a readble string
         cool_show = lambda x: ( "W" if x == WHITE else ( "B" if x == BLACK else "."))
         
 
@@ -159,9 +164,11 @@ class RandomHexBot:
                 search_path.append(node)
             
             # add if win or lose
+            value = isWin(node.state, self.neighbours, node.turn)
 
-            value, action_probs = self.dummy_model_predict(node.state)
-            node.expand(action_probs)
+            if value == 0:
+                value, action_probs = self.dummy_model_predict(node.state)
+                node.expand(action_probs)
 
             for node in search_path:
                 node.value += value
@@ -233,51 +240,7 @@ class RandomHexBot:
             int: 1 if this bot has won, -1 if the opponent has won, and 0 otherwise. Note that draws
             are mathematically impossible in Hex.
         """
-        seen = set()
-
-        def dfs(i, color, level=0):
-            """Oopsie poopsie! I made a fucky wucky! This code is super-duper slow! UwU7
-
-            Args:
-                i (int): The current location of the depth-first search
-                color (int): The current color of the dfs.
-            """
-            is_right_column = (i + 1) % self.board_size == 0
-            is_bottom_row = i >= self.board_size * (self.board_size - 1)
-
-            if color == WHITE and is_right_column:
-                return True
-            elif color == BLACK and is_bottom_row:
-                return True
-
-            # Label hexagon as 'visited' so we don't get infinite recusion
-            seen.add(i)
-            for neighbour in self.neighbours[i]:
-                if (
-                    neighbour not in seen
-                    and self.board[neighbour] == color
-                    and dfs(neighbour, color, level=level + 1)
-                ):
-                    return True
-
-            # Remove hexagon so we can examine it again next time (hint:is this needed?)
-            seen.remove(i)
-            return False
-
-        # Iterate over all starting spaces for black & white, performing dfs on empty
-        # spaces (hint: this leads to repeated computation!)
-        for i in range(0, self.board_size):
-            if self.board[i] == BLACK and dfs(i, BLACK):
-                print(1 if self.color == BLACK else -1)
-                return
-
-        for i in range(0, len(self.board), self.board_size):
-            if self.board[i] == WHITE and dfs(i, WHITE):
-                print(1 if self.color == WHITE else -1)
-                return
-
-        print(0)
-        return
+        print(isWin(self.board, self.neighbours, self.color))
 
     def init_neighbours(self):
         """Precalculates all neighbours for each cell"""
