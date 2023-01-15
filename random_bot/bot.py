@@ -1,10 +1,39 @@
-from multiprocessing.sharedctypes import Value
 from constants import EMPTY, WHITE, BLACK
 from random import choice, seed
-
+import math
+# from copy import deepcopy
 seed(42)  # Get same results temporarily
 
 # Note: WHITE goes left->right, BLACK goes top->bottom
+
+class Node:
+    def __init__(self, prior, turn, state) -> None:
+        self.prior  = prior
+        self.turn   = turn
+        self.state  = state
+        self.children = {}
+        self.value = 0
+        self.vists = 0
+
+    def expand(self, action_prob):
+        for action, prob in enumerate(action_prob):
+            if prob > 0:
+                state_copy = [ val for val in self.state]
+                state_copy[action] = self.turn
+                self.children[action] = Node(prob, -1*self.turn, state_copy)
+    
+    def select_child(self):
+        ucb = lambda child, parent : (child.prior * math.sqrt(parent.vists) / (child.vists + 1)) +  ((child.value/child.vists) if child.vists != 0 else 0)
+        max_score = -1e9
+        for action, child in self.children.items():
+            score = ucb(self, child)
+            if score > max_score:
+                selected_action  = action
+                selected_child  = child
+                max_score = score
+        
+        return selected_action, selected_child
+
 
 class RandomHexBot:
     def __init__(self, color, board_size=11):
@@ -95,6 +124,17 @@ class RandomHexBot:
         print("".join(chars))
         return
 
+    def dummy_model_predict(self, state):
+
+        policy_head = [ 0 for _ in self.board]
+        for i, cell in enumerate(state):
+            if cell == EMPTY:
+                policy_head[i] = 0.5
+        
+        value_head = 0.5
+
+        return value_head, policy_head
+
     def make_move(self):
         """Generates the move. For this bot, the move is randomly selected from all empty positions."""
         empties = []
@@ -102,10 +142,47 @@ class RandomHexBot:
             if cell == EMPTY:
                 empties.append(i)
 
-        move = self.coord_to_move(choice(empties))
+        root = Node(prior=0, turn=1, state=self.board)
+
+        value, action_probs = self.dummy_model_predict(self.board)
+        root.expand(action_probs)
+
+        cool_show = lambda x: ( "W" if x == WHITE else ( "B" if x == BLACK else "."))
+        
+
+        sim = 100
+        for _ in range(sim):
+            node = root
+            search_path = [node]
+            while len(node.children) > 0:
+                action, node = node.select_child()
+                search_path.append(node)
+            
+            # add if win or lose
+
+            value, action_probs = self.dummy_model_predict(node.state)
+            node.expand(action_probs)
+
+            for node in search_path:
+                node.value += value
+                node.vists += 1
+
+        
+
+        # print([ (node.value, "".join(map(cool_show, node.state))) for node in root.children.values()])
+
+        max_val = -1e9
+        for action, node in root.children.items():
+            if node.value > max_val:
+                max_action = action
+                max_val = node.value
+
+        move = self.coord_to_move(pos := max_action)
         self.sety(move)
         print(move)
         return
+
+
 
     def seto(self, move):
         """Tells the bot about a move for the other bot

@@ -21,8 +21,9 @@ def main():
         try:
             getattr(bot, cmd[0])
             bot.run_command(cmd)
-        except AttributeError:
+        except AttributeError as err:
             print("Cmd not recognized. Please refer to known commands.")
+            print(err)
 
         cmd = get_cmd()
     return
